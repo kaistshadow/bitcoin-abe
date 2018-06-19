@@ -85,6 +85,13 @@ def parse_Transaction(vds, has_nTime=False):
   if has_nTime:
     d['nTime'] = vds.read_uint32()
   n_vin = vds.read_compact_size()
+  segwit_flag = False
+  if n_vin == 0:
+    print "segwit transaction"
+    segwit_flag = vds.read_boolean()
+    start_pos_segwit1 = vds.read_cursor - 2
+    end_pos_segwit1 = vds.read_cursor
+    n_vin = vds.read_compact_size()
   d['txIn'] = []
   for i in xrange(n_vin):
     d['txIn'].append(parse_TxIn(vds))
@@ -92,8 +99,19 @@ def parse_Transaction(vds, has_nTime=False):
   d['txOut'] = []
   for i in xrange(n_vout):
     d['txOut'].append(parse_TxOut(vds))
+
+  if segwit_flag:
+    start_pos_segwit2 = vds.read_cursor
+    n_stack = vds.read_compact_size()
+    for i in xrange(n_stack):
+      stack_len = vds.read_compact_size()
+      stack_content = vds.read_bytes(stack_len)
+    end_pos_segwit2 = vds.read_cursor
   d['lockTime'] = vds.read_uint32()
-  d['__data__'] = vds.input[start_pos:vds.read_cursor]
+  if segwit_flag:
+    d['__data__'] = vds.input[start_pos:start_pos_segwit1] + vds.input[end_pos_segwit1:start_pos_segwit2] + vds.input[end_pos_segwit2:vds.read_cursor]
+  else:
+    d['__data__'] = vds.input[start_pos:vds.read_cursor]
   return d
 
 def deserialize_Transaction(d, transaction_index=None, owner_keys=None, print_raw_tx=False):
